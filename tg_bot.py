@@ -3,11 +3,17 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging
 from dotenv import load_dotenv
 import os
+import sqlite3
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
+
+conn = sqlite3.connect('tg_bot_database/tg_bot_database.db',
+    check_same_thread=False)
+cursor = conn.cursor()
 
 
 def handle_start(update, context):
@@ -24,6 +30,7 @@ def handle_start(update, context):
         fr'Привет, {user.mention_markdown_v2()}\!',
         reply_markup=reply_markup
     )
+    add_user_to_db(user_id=update.message.chat_id, user_name=user.username)
 
 
 def handle_stop(update, context):
@@ -35,10 +42,16 @@ def echo(update, context):
     update.message.reply_text(update.message.text)
 
 
+def add_user_to_db(user_id, user_name):
+    cursor.execute('INSERT INTO db_users (id, username) VALUES (?, ?)',
+        (user_id, user_name))
+    conn.commit()
+
+
 def main():
     load_dotenv()
     tg_token = os.getenv("TG_TOKEN")
-    
+  
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
 
