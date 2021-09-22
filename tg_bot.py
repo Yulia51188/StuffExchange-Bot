@@ -1,4 +1,5 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import logging
 from dotenv import load_dotenv
 import os
@@ -10,9 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 def handle_start(update, context):
+    keyboard = [
+        [InlineKeyboardButton("Добавить вещь", callback_data='1')],
+        [InlineKeyboardButton("Найти вещь", callback_data='2')],
+        [InlineKeyboardButton("Хочу обменяться", callback_data='3')],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     user = update.effective_user
     update.message.reply_markdown_v2(
         fr'Привет, {user.mention_markdown_v2()}\!',
+        reply_markup=reply_markup
     )
 
 
