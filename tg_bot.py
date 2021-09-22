@@ -9,10 +9,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def start(update, context):
+def handle_start(update, context):
     user = update.effective_user
     update.message.reply_markdown_v2(
-        fr'Hi {user.mention_markdown_v2()}\!',
+        fr'Привет, {user.mention_markdown_v2()}\!',
     )
 
 
@@ -28,17 +28,15 @@ def echo(update, context):
 def main():
     load_dotenv()
     tg_token = os.getenv("TG_TOKEN")
+    
     updater = Updater(tg_token)
-
     dispatcher = updater.dispatcher
 
-    dispatcher.add_handler(CommandHandler("start", start))
-
+    dispatcher.add_handler(CommandHandler("start", handle_start))
     dispatcher.add_handler(CommandHandler("stop", handle_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
     updater.start_polling()
-
     updater.idle()
 
 
