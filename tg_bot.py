@@ -16,6 +16,11 @@ def start(update, context):
     )
 
 
+def handle_stop(update, context):
+    user = update.effective_user
+    update.message.reply_text(f'До свидания, {user.username}!')
+
+
 def echo(update, context):
     update.message.reply_text(update.message.text)
 
@@ -29,6 +34,7 @@ def main():
 
     dispatcher.add_handler(CommandHandler("start", start))
 
+    dispatcher.add_handler(CommandHandler("stop", handle_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
     updater.start_polling()
