@@ -61,7 +61,8 @@ def handle_add_stuff(update, context):
 def handle_new_stuff_photo(update, context): 
     logger.info('handle_new_stuff_photo'.upper())
     stuff_photo = update.message.photo[0]
-    add_photo_to_new_stuff(update.message.chat_id, update.effective_user, stuff_photo)
+    add_photo_to_new_stuff(update.message.chat_id, update.effective_user,
+        stuff_photo)
     update.message.reply_text(
         'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
@@ -71,7 +72,8 @@ def handle_new_stuff_photo(update, context):
 
 def handle_new_stuff_title(update, context):  
     stuff_title = update.message.text
-    create_new_stuff(update.message.chat_id, update.effective_user, stuff_title)
+    create_new_stuff(update.message.chat_id, update.effective_user,
+        stuff_title)
     update.message.reply_text(f'Добавлена вещь, {stuff_title}')
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
