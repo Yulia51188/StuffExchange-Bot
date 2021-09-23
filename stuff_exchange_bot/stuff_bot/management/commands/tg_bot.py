@@ -14,6 +14,14 @@ from telegram.ext import (
     Updater,
 )
 from telegram.utils.request import Request
+import logging
+
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+_current_stuff = None
 
 
 class States(Enum):
