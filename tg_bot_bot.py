@@ -97,14 +97,16 @@ def main():
         entry_points=[CommandHandler('start', handle_start)],
         states={
             States.WAITING_FOR_CLICK: [
-                MessageHandler(Filters.regex('^Добавить вещь$'), handle_add_stuff),
+                MessageHandler(Filters.regex('^Добавить вещь$'),
+                    handle_add_stuff),
                 MessageHandler(Filters.text & ~Filters.command, handle_unknown)
             ],
             States.WAITING_INPUT_TITLE: [
-                MessageHandler(Filters.text & ~Filters.command, handle_new_stuff_title)
+                MessageHandler(Filters.text & ~Filters.command,
+                    handle_new_stuff_title)
             ],
             States.WAITING_INPUT_PHOTO: [
-                MessageHandler(Filters.photo, handle_new_stuff_photo)
+                MessageHandler(Filters.photo, handle_new_stuff_photo),
             ]
         },
         fallbacks=[CommandHandler('stop', handle_stop)]
