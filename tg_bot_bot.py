@@ -1,10 +1,9 @@
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
     ConversationHandler)
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 import logging
 from dotenv import load_dotenv
 import os
-import re
 from enum import Enum
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
