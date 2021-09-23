@@ -18,12 +18,16 @@ class States(Enum):
     WAITING_INPUT_TITLE = 2
     WAITING_INPUT_PHOTO = 3
 
-
+#TO DO: add db functions 
 def create_new_stuff(chat_id, user, title):
     pass
 
 
 def add_photo_to_new_stuff(chat_id, user, title):
+    pass
+
+
+def add_user_to_db(chat_id, user):
     pass
 
 
@@ -37,6 +41,9 @@ def handle_start(update, context):
         fr'Привет, {user.mention_markdown_v2()}\!',
         reply_markup=get_start_keyboard_markup()
     ) 
+    add_user_to_db(update.message.chat_id, user)
+    return States.WAITING_FOR_CLICK
+
     return States.WAITING_FOR_CLICK
 
 
