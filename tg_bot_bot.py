@@ -31,6 +31,17 @@ def add_user_to_db(chat_id, user):
     pass
 
 
+def get_random_stuff(chat_id):
+    stuff_id = 3
+    stuff_title = 'Очень полезная вещь в хозяйстве'
+    with open(os.path.join('media', 'test_stuff_photo.jpeg'), 'rb') as image_file:
+        stuff_photo = image_file.read()
+    return stuff_id, stuff_title, stuff_photo
+    # Fallback kind of photo object: URL
+    # stuff_photo_url = 'https://i.imgur.com/zbUoVLn.png'
+    # return stuff_id, stuff_title, stuff_photo_url
+
+
 def handle_error(bot, update, error):
     logger.error('Update "%s" caused error "%s"', update, error)
 
@@ -44,6 +55,16 @@ def handle_start(update, context):
     add_user_to_db(update.message.chat_id, user)
     return States.WAITING_FOR_CLICK
 
+
+def handle_find_stuff(update, context):
+    stuff_id, stuff_title, stuff_photo = get_random_stuff(
+        update.message.chat_id)
+    update.message.bot.send_photo(
+        chat_id=update.message.chat_id,
+        photo=stuff_photo,
+        caption=f'{stuff_title} #{stuff_id}',
+        reply_markup=get_full_keyboard_markup()
+    )
     return States.WAITING_FOR_CLICK
 
 
@@ -102,6 +123,15 @@ def get_start_keyboard_markup():
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
 
+def get_full_keyboard_markup():
+    keyboard = [
+        ['Добавить вещь'],
+        ['Найти вещь'],
+        ['Хочу обменяться'],
+    ]
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+
+
 def main():
     load_dotenv()
     tg_token = os.getenv("TG_TOKEN")
@@ -115,6 +145,8 @@ def main():
             States.WAITING_FOR_CLICK: [
                 MessageHandler(Filters.regex('^Добавить вещь$'),
                     handle_add_stuff),
+                MessageHandler(Filters.regex('^Найти вещь$'),
+                    handle_find_stuff),
                 MessageHandler(Filters.text & ~Filters.command, handle_unknown)
             ],
             States.WAITING_INPUT_TITLE: [
