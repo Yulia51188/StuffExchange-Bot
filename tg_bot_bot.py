@@ -78,6 +78,13 @@ def handle_unknown(update, context):
     return States.WAITING_FOR_CLICK    
 
 
+def handle_no_photo(update, context):
+    update.message.reply_text(
+        'Загрузите фото, пожалуйста'
+    )    
+    return States.WAITING_INPUT_PHOTO    
+
+
 def get_start_keyboard_markup():
     keyboard = [
         ['Добавить вещь'],
@@ -107,6 +114,7 @@ def main():
             ],
             States.WAITING_INPUT_PHOTO: [
                 MessageHandler(Filters.photo, handle_new_stuff_photo),
+                MessageHandler(Filters.text & ~Filters.command, handle_no_photo)
             ]
         },
         fallbacks=[CommandHandler('stop', handle_stop)]
