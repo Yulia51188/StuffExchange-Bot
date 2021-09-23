@@ -1,16 +1,19 @@
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-    ConversationHandler)
-from telegram import ReplyKeyboardMarkup
-import logging
-from dotenv import load_dotenv
 import os
 from enum import Enum
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-_current_stuff = None
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from dotenv import load_dotenv
+from stuff_bot.models import Profile, Stuff
+from telegram import Bot, ReplyKeyboardMarkup
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
+from telegram.utils.request import Request
 
 
 class States(Enum):
@@ -20,24 +23,40 @@ class States(Enum):
     WAITING_INPUT_PHOTO = 3
 
 
-#TO DO: add db functions 
+# TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
-    # Need DB 
+    profile, _ = Profile.objects.get_or_create(
+        external_id=chat_id,
+        defaults={
+            'name': user.username,
+        }
+    )
+    stuff = Stuff(
+        profile=profile,
+        description=title,
+    )
+    stuff.save()
     pass
 
 
 def add_photo_to_new_stuff(chat_id, user, title):
-    # Need DB 
+    #
     pass
 
 
 def add_user_to_db(chat_id, user):
-    # Need DB 
+    p, _ = Profile.objects.get_or_create(
+        external_id=chat_id,
+        defaults={
+            'name': user.username,
+        }
+    )
+    p.save()
     pass
 
 
 def make_exchange(chat_id, stuff_id):
-    # Need DB 
+    # Need DB
     # Test Data
     is_available = True
     stuff = {'id': 3, 'title': 'Зайчик'}
@@ -48,7 +67,7 @@ def make_exchange(chat_id, stuff_id):
 
 
 def get_random_stuff(chat_id):
-    # Need DB 
+    # Need DB
     # Test Data
     stuff_id = 3
     stuff_title = 'Очень полезная вещь в хозяйстве'
@@ -70,7 +89,7 @@ def handle_start(update, context):
     update.message.reply_text(
         text=f'Привет, {user.username}!',
         reply_markup=get_start_keyboard_markup()
-    ) 
+    )
     add_user_to_db(update.message.chat_id, user)
     return States.WAITING_FOR_CLICK
 
@@ -105,22 +124,22 @@ def handle_add_stuff(update, context):
     return States.WAITING_INPUT_TITLE
 
 
-def handle_new_stuff_photo(update, context): 
+def handle_new_stuff_photo(update, context):
     logger.info('handle_new_stuff_photo'.upper())
     stuff_photo = update.message.photo[0]
     add_photo_to_new_stuff(update.message.chat_id, update.effective_user,
-        stuff_photo)
+                           stuff_photo)
     update.message.reply_text(
         'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
-    )    
+    )
     return States.WAITING_FOR_CLICK
 
 
-def handle_new_stuff_title(update, context):  
+def handle_new_stuff_title(update, context):
     stuff_title = update.message.text
     create_new_stuff(update.message.chat_id, update.effective_user,
-        stuff_title)
+                     stuff_title)
     update.message.reply_text(f'Добавлена вещь, {stuff_title}')
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
@@ -134,9 +153,9 @@ def handle_exchange(update, context):
     update.message.reply_text('Заявка на обмен принята')
     if is_available:
         update.message.reply_text(f'Контакты для обмена '
-            f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
-            reply_markup=get_start_keyboard_markup()
-        )
+                                  f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
+                                  reply_markup=get_start_keyboard_markup()
+                                  )
         update.message.bot.send_message(
             chat_id=int(owner["chat_id"]),
             text=f'''Контакты для обмена "{exchange_stuff["title"]}\
@@ -144,7 +163,7 @@ def handle_exchange(update, context):
         )
 
     _current_stuff = None
-    
+
     return States.WAITING_FOR_CLICK
 
 
@@ -152,15 +171,15 @@ def handle_unknown(update, context):
     update.message.reply_text(
         'Сообщение не распознано',
         reply_markup=get_start_keyboard_markup()
-    )    
-    return States.WAITING_FOR_CLICK    
+    )
+    return States.WAITING_FOR_CLICK
 
 
 def handle_no_photo(update, context):
     update.message.reply_text(
         'Загрузите фото, пожалуйста'
-    )    
-    return States.WAITING_INPUT_PHOTO    
+    )
+    return States.WAITING_INPUT_PHOTO
 
 
 def get_start_keyboard_markup():
@@ -180,42 +199,51 @@ def get_full_keyboard_markup():
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
 
-def main():
-    load_dotenv()
-    tg_token = os.getenv("TG_TOKEN")
-  
-    updater = Updater(tg_token)
-    dispatcher = updater.dispatcher
+class Command(BaseCommand):
+    help = 'Телеграм-бот'
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', handle_start)],
-        states={
-            States.WAITING_FOR_CLICK: [
-                MessageHandler(Filters.regex('^Добавить вещь$'),
-                    handle_add_stuff),
-                MessageHandler(Filters.regex('^Найти вещь$'),
-                    handle_find_stuff),
-                MessageHandler(Filters.regex('^Хочу обменяться$'),
-                    handle_exchange),
-                MessageHandler(Filters.text & ~Filters.command, handle_unknown)
-            ],
-            States.WAITING_INPUT_TITLE: [
-                MessageHandler(Filters.text & ~Filters.command,
-                    handle_new_stuff_title)
-            ],
-            States.WAITING_INPUT_PHOTO: [
-                MessageHandler(Filters.photo, handle_new_stuff_photo),
-                MessageHandler(Filters.text & ~Filters.command, handle_no_photo)
-            ]
-        },
-        fallbacks=[CommandHandler('stop', handle_stop)]
-    )
-    dispatcher.add_handler(conv_handler)
+    def handle(self, *args, **options):
+        # 1 -- правильное подключение
+        request = Request(
+            connect_timeout=0.5,
+            read_timeout=1.0,
+        )
+        bot = Bot(
+            request=request,
+            token=settings.TOKEN,
+            base_url=getattr(settings, 'PROXY_URL', None),
+        )
+        print(bot.get_me())
 
-    updater.start_polling()
+        # 2 -- обработчики
+        updater = Updater(settings.TOKEN)
+        dispatcher = updater.dispatcher
 
-    updater.idle()
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', handle_start)],
+            states={
+                States.WAITING_FOR_CLICK: [
+                    MessageHandler(Filters.regex('^Добавить вещь$'),
+                                   handle_add_stuff),
+                    MessageHandler(Filters.regex('^Найти вещь$'),
+                                   handle_find_stuff),
+                    MessageHandler(Filters.regex('^Хочу обменяться$'),
+                                   handle_exchange),
+                    MessageHandler(Filters.text & ~Filters.command, handle_unknown)
+                ],
+                States.WAITING_INPUT_TITLE: [
+                    MessageHandler(Filters.text & ~Filters.command,
+                                   handle_new_stuff_title)
+                ],
+                States.WAITING_INPUT_PHOTO: [
+                    MessageHandler(Filters.photo, handle_new_stuff_photo),
+                    MessageHandler(Filters.text & ~Filters.command, handle_no_photo)
+                ]
+            },
+            fallbacks=[CommandHandler('stop', handle_stop)]
+        )
+        dispatcher.add_handler(conv_handler)
 
-
-if __name__ == '__main__':
-    main()
+        # 3 -- запустить бесконечную обработку входящих сообщений
+        updater.start_polling()
+        updater.idle()
