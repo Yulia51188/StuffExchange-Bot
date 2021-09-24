@@ -1,10 +1,13 @@
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-    ConversationHandler)
-from telegram import ReplyKeyboardMarkup
 import logging
-from dotenv import load_dotenv
 import os
+import random
 from enum import Enum
+
+from dotenv import load_dotenv
+import pandas as pd
+from telegram import ReplyKeyboardMarkup
+from telegram.ext import (CommandHandler, ConversationHandler, Filters,
+                          MessageHandler, Updater)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -18,17 +21,36 @@ class States(Enum):
     WAITING_FOR_CLICK = 1
     WAITING_INPUT_TITLE = 2
     WAITING_INPUT_PHOTO = 3
-
+STUFF_DB_FILENAME = 'stuff.csv'
 
 #TO DO: add db functions 
-def create_new_stuff(chat_id, user, title):
-    # Need DB 
-    pass
+def create_new_stuff(chat_id, user, title, db_filename=STUFF_DB_FILENAME):
+    if not os.path.exists(db_filename):
+        stuff_df = pd.DataFrame(columns=['stuff_id', 'chat_id', 'username',
+            'stuff_title', 'image_url']).set_index('stuff_id')
+        stuff_id = 0
+    else:
+        stuff_df = pd.read_csv(db_filename).set_index('stuff_id')
+        stuff_id = stuff_df.index.max() + 1
+
+    new_stuff = pd.Series(
+        data={
+            'chat_id': chat_id, 
+            'username': user.username,
+            'stuff_title': title,
+            'image_url': '',
+        },
+        name=stuff_id
+    )
+    new_stuff_df = stuff_df.append(new_stuff)
+    new_stuff_df.to_csv(db_filename)
 
 
-def add_photo_to_new_stuff(chat_id, user, title):
-    # Need DB 
-    pass
+def add_photo_to_new_stuff(chat_id, photo_url, db_filename=STUFF_DB_FILENAME):
+    stuff_df = pd.read_csv(db_filename).set_index('stuff_id')
+    stuff_id = stuff_df[stuff_df.chat_id == chat_id].index.max() 
+    stuff_df['image_url'][stuff_id] = photo_url
+    stuff_df.to_csv(db_filename)
 
 
 def add_user_to_db(chat_id, user):
@@ -47,18 +69,14 @@ def make_exchange(chat_id, stuff_id):
     return is_available, stuff, exchange_stuff, owner
 
 
-def get_random_stuff(chat_id):
-    # Need DB 
-    # Test Data
-    stuff_id = 3
-    stuff_title = 'Очень полезная вещь в хозяйстве'
-    with open(os.path.join('media', 'test_stuff_photo.jpeg'), 'rb') as image_file:
-        stuff_photo = image_file.read()
-    # ----------
-    return stuff_id, stuff_title, stuff_photo
-    # Fallback kind of photo object: URL
-    # stuff_photo_url = 'https://i.imgur.com/zbUoVLn.png'
-    # return stuff_id, stuff_title, stuff_photo_url
+def get_random_stuff(chat_id, db_filename=STUFF_DB_FILENAME):
+    stuff_df = pd.read_csv(db_filename).set_index('stuff_id')
+    alias_stuff_df = stuff_df[stuff_df.chat_id != chat_id]
+    if alias_stuff_df.empty:
+        return None
+    rand_index = random.choice(alias_stuff_df.index)
+    rand_stuff = stuff_df.loc[rand_index]
+    return rand_stuff.name, rand_stuff["stuff_title"], rand_stuff["image_url"]
 
 
 def handle_error(bot, update, error):
@@ -76,16 +94,25 @@ def handle_start(update, context):
 
 
 def handle_find_stuff(update, context):
-    stuff_id, stuff_title, stuff_photo = get_random_stuff(
+    global _current_stuff
+
+    random_stuff = get_random_stuff(
         update.message.chat_id)
+    if not random_stuff:
+        update.message.reply_text(
+            text='Не найдено вещей других пользователей',
+            reply_markup=get_start_keyboard_markup()
+        ) 
+        _current_stuff = None              
+    
+    stuff_id, stuff_title, stuff_photo_url = random_stuff
     update.message.bot.send_photo(
         chat_id=update.message.chat_id,
-        photo=stuff_photo,
-        caption=f'{stuff_title} #{stuff_id}',
+        photo=stuff_photo_url,
+        caption=f'{stuff_title}',
         reply_markup=get_full_keyboard_markup()
     )
 
-    global _current_stuff
     _current_stuff = stuff_id
 
     return States.WAITING_FOR_CLICK
@@ -106,10 +133,8 @@ def handle_add_stuff(update, context):
 
 
 def handle_new_stuff_photo(update, context): 
-    logger.info('handle_new_stuff_photo'.upper())
     stuff_photo = update.message.photo[0]
-    add_photo_to_new_stuff(update.message.chat_id, update.effective_user,
-        stuff_photo)
+    add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id)
     update.message.reply_text(
         'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
