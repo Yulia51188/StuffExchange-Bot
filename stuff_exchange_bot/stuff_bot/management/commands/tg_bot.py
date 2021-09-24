@@ -75,17 +75,7 @@ def make_exchange(chat_id, stuff_id):
 
 
 def get_random_stuff(chat_id):
-    # Need DB
-    # Test Data
-    stuff_id = 3
-    stuff_title = 'Очень полезная вещь в хозяйстве'
-    with open(os.path.join('media', 'test_stuff_photo.jpeg'), 'rb') as image_file:
-        stuff_photo = image_file.read()
-    # ----------
-    return stuff_id, stuff_title, stuff_photo
-    # Fallback kind of photo object: URL
-    # stuff_photo_url = 'https://i.imgur.com/zbUoVLn.png'
-    # return stuff_id, stuff_title, stuff_photo_url
+    return None
 
 
 def handle_error(bot, update, error):
