@@ -15,6 +15,16 @@ from telegram.ext import (
 )
 from telegram.utils.request import Request
 
+import logging
+import random
+
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+_current_stuff = None
+
 
 class States(Enum):
     START = 0
@@ -25,13 +35,8 @@ class States(Enum):
 
 # TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
-    profile, _ = Profile.objects.get_or_create(
-        external_id=chat_id,
-        defaults={
-            'name': user.username,
-        }
-    )
-    stuff = Stuff(
+    profile = Profile.objects.filter(name=user.username)[0]
+    stuff = Stuff.objects.create(
         profile=profile,
         description=title,
     )
@@ -41,6 +46,13 @@ def create_new_stuff(chat_id, user, title):
 
 def add_photo_to_new_stuff(chat_id, user, title):
     #
+=======
+    stuff_id = stuff.id
+    return stuff_id
+
+
+def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
+    add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
     pass
 
 
@@ -56,28 +68,20 @@ def add_user_to_db(chat_id, user):
 
 
 def make_exchange(chat_id, stuff_id):
-    # Need DB
-    # Test Data
     is_available = True
-    stuff = {'id': 3, 'title': 'Зайчик'}
+    stuff = {'id': chat_id, 'title': 'Tecт'}
     exchange_stuff = {'id': 2, 'title': 'Книга о вкусной и здоровой пище'}
-    owner = {'chat_id': '1967131305', 'username': 'yulya6a'}
-    # --------
+    owner = {'chat_id': chat_id, 'username': 'Test'}
     return is_available, stuff, exchange_stuff, owner
 
 
 def get_random_stuff(chat_id):
-    # Need DB
-    # Test Data
-    stuff_id = 3
-    stuff_title = 'Очень полезная вещь в хозяйстве'
-    with open(os.path.join('media', 'test_stuff_photo.jpeg'), 'rb') as image_file:
-        stuff_photo = image_file.read()
-    # ----------
+    random_stuff = list(Stuff.objects.all())
+    random_item = random.choice(random_stuff)
+    stuff_id = random_item.id
+    stuff_title = random_item.description
+    stuff_photo = random_item.image_url
     return stuff_id, stuff_title, stuff_photo
-    # Fallback kind of photo object: URL
-    # stuff_photo_url = 'https://i.imgur.com/zbUoVLn.png'
-    # return stuff_id, stuff_title, stuff_photo_url
 
 
 def handle_error(bot, update, error):
@@ -100,7 +104,7 @@ def handle_find_stuff(update, context):
     update.message.bot.send_photo(
         chat_id=update.message.chat_id,
         photo=stuff_photo,
-        caption=f'{stuff_title} #{stuff_id}',
+        caption=f'{stuff_title}',
         reply_markup=get_full_keyboard_markup()
     )
 
@@ -120,27 +124,29 @@ def handle_add_stuff(update, context):
     global _current_stuff
     _current_stuff = None
 
-    update.message.reply_text('Введите название вещи')
+    update.message.reply_text(f'Введите название вещи')
     return States.WAITING_INPUT_TITLE
 
 
 def handle_new_stuff_photo(update, context):
-    logger.info('handle_new_stuff_photo'.upper())
+    global _new_stuff_id
     stuff_photo = update.message.photo[0]
     add_photo_to_new_stuff(update.message.chat_id, update.effective_user,
                            stuff_photo)
     update.message.reply_text(
-        'Фото вещи добавлено',
+        f'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
     )
     return States.WAITING_FOR_CLICK
 
 
 def handle_new_stuff_title(update, context):
+    global _new_stuff_id
     stuff_title = update.message.text
     create_new_stuff(update.message.chat_id, update.effective_user,
                      stuff_title)
     update.message.reply_text(f'Добавлена вещь, {stuff_title}')
+    _new_stuff_id = stuff_id
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
 
@@ -218,7 +224,6 @@ class Command(BaseCommand):
         # 2 -- обработчики
         updater = Updater(settings.TOKEN)
         dispatcher = updater.dispatcher
-
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', handle_start)],
             states={
