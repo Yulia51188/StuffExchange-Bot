@@ -21,7 +21,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
-_current_stuff = None
+_current_stuff_id = None
+_new_stuff_id = None
 
 
 class States(Enum):
@@ -44,10 +45,9 @@ def create_new_stuff(chat_id, user, title):
         description=title,
     )
     stuff.save()
-    pass
+    
 
-
-def add_photo_to_new_stuff(chat_id, photo_url):
+def add_photo_to_new_stuff(chat_id, photo_url, stuff_id):
     #
     pass
 
@@ -60,7 +60,6 @@ def add_user_to_db(chat_id, user):
         }
     )
     p.save()
-    pass
 
 
 def make_exchange(chat_id, stuff_id):
@@ -93,7 +92,7 @@ def handle_start(update, context):
 
 
 def handle_find_stuff(update, context):
-    global _current_stuff
+    global _current_stuff_id
 
     random_stuff = get_random_stuff(
         update.message.chat_id)
@@ -102,7 +101,7 @@ def handle_find_stuff(update, context):
             text='Не найдено вещей других пользователей',
             reply_markup=get_start_keyboard_markup()
         ) 
-        _current_stuff = None              
+        _current_stuff_id = None              
     
     stuff_id, stuff_title, stuff_photo_url = random_stuff
     update.message.bot.send_photo(
@@ -112,7 +111,7 @@ def handle_find_stuff(update, context):
         reply_markup=get_full_keyboard_markup()
     )
 
-    _current_stuff = stuff_id
+    _current_stuff_id = stuff_id
 
     return States.WAITING_FOR_CLICK
 
@@ -124,16 +123,18 @@ def handle_stop(update, context):
 
 
 def handle_add_stuff(update, context):
-    global _current_stuff
-    _current_stuff = None
+    global _current_stuff_id
+    _current_stuff_id = None
 
     update.message.reply_text('Введите название вещи')
     return States.WAITING_INPUT_TITLE
 
 
 def handle_new_stuff_photo(update, context): 
+    global _new_stuff_id
     stuff_photo = update.message.photo[0]
-    add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id)
+    add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id,
+        _new_stuff_id)
     update.message.reply_text(
         'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
@@ -142,19 +143,22 @@ def handle_new_stuff_photo(update, context):
 
 
 def handle_new_stuff_title(update, context):  
+    global _new_stuff_id
+
     stuff_title = update.message.text
-    create_new_stuff(update.message.chat_id, update.effective_user,
+    stuff_id = create_new_stuff(update.message.chat_id, update.effective_user,
         stuff_title)
-    update.message.reply_text(f'Добавлена вещь, {stuff_title}')
+    update.message.reply_text(f'Добавлена вещь, {stuff_title} #{stuff_id}')
+    _new_stuff_id = stuff_id
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
 
 
 def handle_exchange(update, context):
-    global _current_stuff
+    global _current_stuff_id
 
     is_available, stuff, exchange_stuff, owner = make_exchange(
-        update.message.chat_id, _current_stuff)
+        update.message.chat_id, _current_stuff_id)
     update.message.reply_text('Заявка на обмен принята')
     if is_available:
         update.message.reply_text(f'Контакты для обмена '
@@ -167,7 +171,7 @@ def handle_exchange(update, context):
                 #{exchange_stuff["id"]}": @{update.effective_user.username}'''
         )
 
-    _current_stuff = None
+    _current_stuff_id = None
     
     return States.WAITING_FOR_CLICK
 
