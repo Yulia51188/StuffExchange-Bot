@@ -56,8 +56,7 @@ def get_random_stuff(chat_id, db_filename=STUFF_DB_FILENAME):
     rand_index = random.choice(alias_stuff_df.index)
     logger.info(rand_index)
     rand_stuff = stuff_df.loc[rand_index]
-    logger.info(rand_stuff)
-    logger.info(rand_stuff.name, rand_stuff["stuff_title"], rand_stuff["image_url"])    
+    logger.info(rand_stuff) 
     return rand_stuff.name, rand_stuff["stuff_title"], rand_stuff["image_url"]
 
 
