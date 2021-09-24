@@ -24,6 +24,16 @@ logger = logging.getLogger(__name__)
 _current_stuff_id = None
 _new_stuff_id = None
 
+import logging
+import random
+
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+_current_stuff = None
+
 
 class States(Enum):
     START = 0
@@ -34,23 +44,17 @@ class States(Enum):
 
 # TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
-    profile, _ = Profile.objects.get_or_create(
-        external_id=chat_id,
-        defaults={
-            'name': user.username,
-        }
-    )
-    stuff = Stuff(
+    profile = Profile.objects.filter(name=user.username)[0]
+    stuff = Stuff.objects.create(
         profile=profile,
         description=title,
     )
     stuff.save()
+
+
+def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
+    add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
     
-
-def add_photo_to_new_stuff(chat_id, photo_url, stuff_id):
-    #
-    pass
-
 
 def add_user_to_db(chat_id, user):
     p, _ = Profile.objects.get_or_create(
@@ -63,18 +67,20 @@ def add_user_to_db(chat_id, user):
 
 
 def make_exchange(chat_id, stuff_id):
-    # Need DB
-    # Test Data
     is_available = True
-    stuff = {'id': 3, 'title': 'Зайчик'}
+    stuff = {'id': chat_id, 'title': 'Tecт'}
     exchange_stuff = {'id': 2, 'title': 'Книга о вкусной и здоровой пище'}
-    owner = {'chat_id': '1967131305', 'username': 'yulya6a'}
-    # --------
+    owner = {'chat_id': chat_id, 'username': 'Test'}
     return is_available, stuff, exchange_stuff, owner
 
 
 def get_random_stuff(chat_id):
-    return None
+    random_stuff = list(Stuff.objects.all())
+    random_item = random.choice(random_stuff)
+    stuff_id = random_item.id
+    stuff_title = random_item.description
+    stuff_photo = random_item.image_url
+    return stuff_id, stuff_title, stuff_photo
 
 
 def handle_error(bot, update, error):
@@ -126,29 +132,26 @@ def handle_add_stuff(update, context):
     global _current_stuff_id
     _current_stuff_id = None
 
-    update.message.reply_text('Введите название вещи')
+    update.message.reply_text(f'Введите название вещи')
     return States.WAITING_INPUT_TITLE
 
-
-def handle_new_stuff_photo(update, context): 
+def handle_new_stuff_photo(update, context):
     global _new_stuff_id
     stuff_photo = update.message.photo[0]
     add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id,
         _new_stuff_id)
     update.message.reply_text(
-        'Фото вещи добавлено',
+        f'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
     )    
     return States.WAITING_FOR_CLICK
 
 
-def handle_new_stuff_title(update, context):  
+def handle_new_stuff_title(update, context):
     global _new_stuff_id
-
     stuff_title = update.message.text
     stuff_id = create_new_stuff(update.message.chat_id, update.effective_user,
         stuff_title)
-    update.message.reply_text(f'Добавлена вещь, {stuff_title}')
     logger.info(
         f'Добавлена вещь {stuff_title} #{stuff_id} от {update.message.chat_id}')
     _new_stuff_id = stuff_id
@@ -229,7 +232,6 @@ class Command(BaseCommand):
         # 2 -- обработчики
         updater = Updater(settings.TOKEN)
         dispatcher = updater.dispatcher
-
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', handle_start)],
             states={
