@@ -41,19 +41,15 @@ def create_new_stuff(chat_id, user, title):
         description=title,
     )
     stuff.save()
-    pass
 
 
 def add_photo_to_new_stuff(chat_id, user, title):
-    #
-=======
     stuff_id = stuff.id
     return stuff_id
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
     add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
-    pass
 
 
 def add_user_to_db(chat_id, user):
@@ -64,7 +60,6 @@ def add_user_to_db(chat_id, user):
         }
     )
     p.save()
-    pass
 
 
 def make_exchange(chat_id, stuff_id):
