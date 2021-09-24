@@ -58,15 +58,17 @@ def add_user_to_db(chat_id, user):
     pass
 
 
-def make_exchange(chat_id, stuff_id):
-    # Need DB 
-    # Test Data
+def make_exchange(chat_id, stuff_id, db_filename=STUFF_DB_FILENAME):
     is_available = True
-    stuff = {'id': 3, 'title': 'Зайчик'}
-    exchange_stuff = {'id': 2, 'title': 'Книга о вкусной и здоровой пище'}
-    owner = {'chat_id': '1967131305', 'username': 'yulya6a'}
-    # --------
-    return is_available, stuff, exchange_stuff, owner
+    stuff_df = pd.read_csv(db_filename).set_index('stuff_id')
+    stuff_to_exchange = stuff_df.loc[stuff_id]
+    logger.info(stuff_to_exchange)
+    stuff = {
+        'id': stuff_to_exchange.name,
+        'title': stuff_to_exchange['stuff_title']
+    }
+    owner = {'chat_id': stuff_to_exchange['chat_id'], 'username': stuff_to_exchange['username']}
+    return is_available, stuff, owner
 
 
 def get_random_stuff(chat_id, db_filename=STUFF_DB_FILENAME):
@@ -154,22 +156,15 @@ def handle_new_stuff_title(update, context):
 def handle_exchange(update, context):
     global _current_stuff
 
-    is_available, stuff, exchange_stuff, owner = make_exchange(
+    is_available, stuff, owner = make_exchange(
         update.message.chat_id, _current_stuff)
     update.message.reply_text('Заявка на обмен принята')
+    _current_stuff = None
     if is_available:
         update.message.reply_text(f'Контакты для обмена '
             f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
             reply_markup=get_start_keyboard_markup()
-        )
-        update.message.bot.send_message(
-            chat_id=int(owner["chat_id"]),
-            text=f'''Контакты для обмена "{exchange_stuff["title"]}\
-                #{exchange_stuff["id"]}": @{update.effective_user.username}'''
-        )
-
-    _current_stuff = None
-    
+        )   
     return States.WAITING_FOR_CLICK
 
 
