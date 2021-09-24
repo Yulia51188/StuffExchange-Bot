@@ -148,7 +148,9 @@ def handle_new_stuff_title(update, context):
     stuff_title = update.message.text
     stuff_id = create_new_stuff(update.message.chat_id, update.effective_user,
         stuff_title)
-    update.message.reply_text(f'Добавлена вещь, {stuff_title} #{stuff_id}')
+    update.message.reply_text(f'Добавлена вещь, {stuff_title}')
+    logger.info(
+        f'Добавлена вещь {stuff_title} #{stuff_id} от {update.message.chat_id}')
     _new_stuff_id = stuff_id
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
