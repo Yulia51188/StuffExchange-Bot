@@ -14,9 +14,10 @@ from telegram.ext import (
     Updater,
 )
 from telegram.utils.request import Request
-
 import logging
 import random
+from django.db.models import Q
+
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,7 +25,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 _current_stuff = None
-
 
 class States(Enum):
     START = 0
@@ -40,38 +40,76 @@ def create_new_stuff(chat_id, user, title):
         profile=profile,
         description=title,
     )
-    stuff.save()
-
-
-def add_photo_to_new_stuff(chat_id, user, title):
     stuff_id = stuff.id
     return stuff_id
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
     add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
+    pass
 
 
 def add_user_to_db(chat_id, user):
     p, _ = Profile.objects.get_or_create(
         external_id=chat_id,
-        defaults={
-            'name': user.username,
-        }
+        name=user.username
     )
     p.save()
+    pass
 
 
 def make_exchange(chat_id, stuff_id):
-    is_available = True
-    stuff = {'id': chat_id, 'title': 'Tecт'}
-    exchange_stuff = {'id': 2, 'title': 'Книга о вкусной и здоровой пище'}
-    owner = {'chat_id': chat_id, 'username': 'Test'}
-    return is_available, stuff, exchange_stuff, owner
+    stuff_info = Stuff.objects.get(id=stuff_id)
+    status_like = stuff_info.status_like_users
+    if status_like is False:
+        new_status_like = [chat_id]
+        stuff_info = Stuff.objects.get(id=stuff_id)
+        stuff_info.status_like_users = new_status_like
+        stuff_info.save()
+        stuff_info = Stuff.objects.get(id=stuff_id)
+        status_like_users = stuff_info.status_like_users
+        logger.info(status_like_users)
+        username = stuff_info.profile
+        users_stuff = Stuff.objects.filter(profile=username)
+        is_available = False
+        for stuff in users_stuff:
+            if stuff.status_like_users is False:
+                pass
+            else:
+                for user in stuff.status_like_users:
+                    if user == username.id:
+                        is_available = True
+        stuff = {'id': chat_id, 'title': stuff_info.description}
+        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
+        owner = {'chat_id': chat_id, 'username': username}
+        return is_available, stuff, exchange_stuff, owner
+    else:
+        stuff_info = Stuff.objects.get(id=stuff_id)
+        users_likes = stuff_info.status_like_users
+        new_users_likes = users_likes + [chat_id]
+        logger.info(new_users_likes)
+        stuff_info.status_like_users = new_users_likes
+        stuff_info.save()
+        username = stuff_info.profile
+        users_stuff = Stuff.objects.filter(profile=username)
+        is_available = False
+        for stuff in users_stuff:
+            if stuff.status_like_users is False:
+                pass
+            else:
+                for user in stuff.status_like_users:
+                    if user == username.id:
+                        is_available = True
+        stuff = {'id': chat_id, 'title': stuff_info.description}
+        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
+        owner = {'chat_id': chat_id, 'username': username}
+        return is_available, stuff, exchange_stuff, owner
 
 
 def get_random_stuff(chat_id):
-    random_stuff = list(Stuff.objects.all())
+    user = Profile.objects.get(external_id=chat_id)
+    username = user.id
+    random_stuff = list(Stuff.objects.filter(~Q(profile=username)))
     random_item = random.choice(random_stuff)
     stuff_id = random_item.id
     stuff_title = random_item.description
@@ -126,8 +164,8 @@ def handle_add_stuff(update, context):
 def handle_new_stuff_photo(update, context):
     global _new_stuff_id
     stuff_photo = update.message.photo[0]
-    add_photo_to_new_stuff(update.message.chat_id, update.effective_user,
-                           stuff_photo)
+    add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id,
+        _new_stuff_id)
     update.message.reply_text(
         f'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup()
@@ -137,9 +175,10 @@ def handle_new_stuff_photo(update, context):
 
 def handle_new_stuff_title(update, context):
     global _new_stuff_id
+
     stuff_title = update.message.text
-    create_new_stuff(update.message.chat_id, update.effective_user,
-                     stuff_title)
+    stuff_id = create_new_stuff(update.message.chat_id, update.effective_user,
+        stuff_title)
     update.message.reply_text(f'Добавлена вещь, {stuff_title}')
     _new_stuff_id = stuff_id
     update.message.reply_text('Добавьте фотографию')
