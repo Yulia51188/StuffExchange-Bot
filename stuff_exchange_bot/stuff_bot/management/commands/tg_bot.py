@@ -128,7 +128,7 @@ def handle_error(bot, update, error):
 def handle_start(update, context):
     user = update.effective_user
     update.message.reply_text(
-        text=f'Привет, {user.username}!',
+        text=f'Привет, {user.first_name}!',
         reply_markup=get_start_keyboard_markup()
     ) 
     add_user_to_db(update.message.chat_id, user)
