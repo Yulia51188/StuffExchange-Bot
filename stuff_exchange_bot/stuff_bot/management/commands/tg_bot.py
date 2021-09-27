@@ -193,23 +193,37 @@ def handle_add_contact(update, context):
         reply_markup=get_start_keyboard_markup()
     )
     logger.info(f'Пользователю {profile.external_id} добавлен контакт {profile.contact}')
+    if not profile.lat:
+        update.message.reply_text(
+            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            reply_markup=get_location_keyboard()
+        )         
+        return States.INPUT_LOCATION
     return States.WAITING_FOR_CLICK
 
 
 def handle_add_location(update, context):
     profile = Profile.objects.get(external_id=update.message.chat_id)
-    # coords = 
-    profile.lat = 55
-    profile.lon = 23
-    profile.save()    
-    update.message.reply_text(
-        f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
-        reply_markup=get_start_keyboard_markup()
-    )
-    logger.info(f'Пользователю {profile.external_id} добавлено местоположение '
-        f'{profile.lat}, {profile.lon}')
+    logger.info(f'{update.message.location.latitude}, {update.message.location.longitude}')
+    profile.save() 
+    if update.message.location: 
+        profile.lat = update.message.location.latitude  
+        profile.lon = update.message.location.longitude
+        update.message.reply_text(
+            f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
+            reply_markup=get_start_keyboard_markup()
+        )
+        logger.info(f'Пользователю {profile.external_id} добавлено местоположение '
+            f'{profile.lat}, {profile.lon}')
     return States.WAITING_FOR_CLICK    
 
+
+def handle_no_location(update, context):
+    update.message.reply_text(
+        'Местоположение не указано',
+        reply_markup=get_start_keyboard_markup()
+    )    
+    return States.WAITING_FOR_CLICK
 
 
 def handle_stop(update, context):
@@ -351,6 +365,7 @@ class Command(BaseCommand):
                 ],
                 States.INPUT_LOCATION:
                 [
+                    MessageHandler(Filters.regex('^Нет$'), handle_no_location),
                     MessageHandler(None, handle_add_location),
                 ],
             },
