@@ -46,9 +46,9 @@ def create_new_stuff(chat_id, user, title):
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
-    stuff = Stuff.objects \
-        .filter(id=_new_stuff_id) \
-        .update(image_url=photo_url)
+    stuff = Stuff.objects.get(id=_new_stuff_id)
+    stuff.image_url = photo_url
+    stuff.save()
     return stuff.id
 
 
