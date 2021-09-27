@@ -75,14 +75,18 @@ def make_exchange(chat_id, stuff_id):
     status_like = stuff_info.status_like_users
     if status_like is False:
         new_status_like = [chat_id]
+        
         stuff_info = Stuff.objects.get(id=stuff_id)
         stuff_info.status_like_users = new_status_like
         stuff_info.save()
+
         username_1 = Profile.objects.get(external_id=chat_id)
         users_stuff = Stuff.objects.filter(profile=username_1)
         stuff_username_2 = Stuff.objects.get(id=stuff_id)
+        
         username_2 = stuff_username_2.profile
         is_available = False
+        
         for stuff in users_stuff:
             if stuff.status_like_users is False:
                 pass
@@ -90,11 +94,15 @@ def make_exchange(chat_id, stuff_id):
                 for user in stuff.status_like_users:
                     if user == username_2.external_id:
                         is_available = True
-        stuff = {'id': chat_id, 'title': stuff_info.description}
-        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': username_2.external_id, 'username': username}
+        stuff = {'id': stuff_id, 'title': stuff_info.description}
+        owner = {
+            'chat_id': username_2.external_id,
+            'username': username_2.tg_username,
+            "contact": username_2.contact
+        }
+        current_user_contact = username_1.contact
         logger.info(is_available)
-        return is_available, stuff, exchange_stuff, owner
+        return is_available, stuff, owner, current_user_contact
     else:
         stuff_info = Stuff.objects.get(id=stuff_id)
         users_likes = stuff_info.status_like_users
@@ -116,9 +124,13 @@ def make_exchange(chat_id, stuff_id):
                     if user == username_2.external_id:
                         is_available = True
         stuff = {'id': chat_id, 'title': stuff_info.description}
-        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': username_2.external_id, 'username': username_2}
-        return is_available, stuff, exchange_stuff, owner
+        owner = {
+            'chat_id': username_2.external_id,
+            'username': username_2.tg_username,
+            "contact": username_2.contact,
+        }
+        current_user_contact = username_1.contact
+        return is_available, stuff, owner, current_user_contact
 
 
 def get_random_stuff(chat_id):
@@ -264,18 +276,26 @@ def handle_new_stuff_title(update, context):
 def handle_exchange(update, context):
     global _current_stuff
 
-    is_available, stuff, exchange_stuff, owner = make_exchange(
+    is_available, stuff, owner, current_user_contact = make_exchange(
         update.message.chat_id, _current_stuff)
     update.message.reply_text('Заявка на обмен принята')
     if is_available:
-        update.message.reply_text(f'Контакты для обмена '
-                                  f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
-                                  reply_markup=get_start_keyboard_markup()
-                                  )
+        if owner["username"]:
+            owner_contact = f'@{owner["username"]}'
+        else:
+            owner_contact = owner["contact"]
+        current_user = update.effective_user
+        if current_user.username:
+            user_contact = f'@{current_user.username}'
+        else:
+            user_contact = current_user_contact
+        update.message.reply_text(
+            f'Контакты для обмена {stuff["title"]}: {owner_contact}',
+            reply_markup=get_start_keyboard_markup()
+        )
         update.message.bot.send_message(
             chat_id=int(owner["chat_id"]),
-            text=f'''Контакты для обмена "{exchange_stuff["title"]}\
-                #{exchange_stuff["id"]}": @{update.effective_user.username}'''
+            text=f'Контакты для обмена {stuff["title"]}: {user_contact}'
         )
 
     _current_stuff = None
