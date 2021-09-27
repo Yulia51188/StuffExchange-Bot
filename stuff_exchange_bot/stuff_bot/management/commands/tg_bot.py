@@ -371,8 +371,7 @@ class Command(BaseCommand):
                 ],
                 States.WAITING_INPUT_PHOTO: [
                     MessageHandler(Filters.photo, handle_new_stuff_photo),
-                    MessageHandler(Filters.text & ~Filters.command,
-                        handle_no_photo)
+                    MessageHandler(~Filters.command, handle_no_photo)
                 ],
                 States.INPUT_CONTACT: [
                     MessageHandler(Filters.text & ~Filters.command,
@@ -384,13 +383,14 @@ class Command(BaseCommand):
                         Filters.regex('Не указывать местоположение$'),
                         handle_no_location
                     ),
-                    MessageHandler(None, handle_add_location),
+                    MessageHandler(~Filters.command, handle_add_location),
                 ],
             },
             fallbacks=[CommandHandler('stop', handle_stop)]
         )
         dispatcher.add_handler(conv_handler)
         dispatcher.add_error_handler(handle_error)
+        dispatcher.add_handler(CommandHandler("start", handle_start))
 
         updater.start_polling()
         updater.idle()
