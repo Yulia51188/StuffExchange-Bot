@@ -236,8 +236,7 @@ def handle_no_location(update, context):
 
 def handle_stop(update, context):
     user = update.effective_user
-    update.message.reply_text(f'До свидания, {user.username}!',
-        reply_markup=get_empty_keyboard())
+    update.message.reply_text(f'До свидания, {user.username}!')
     return ConversationHandler.END
 
 
@@ -316,10 +315,6 @@ def handle_no_photo(update, context):
         'Загрузите фото, пожалуйста'
     )
     return States.WAITING_INPUT_PHOTO
-
-
-def get_empty_keyboard():
-    return ReplyKeyboardMarkup()
 
 
 def get_location_keyboard():
