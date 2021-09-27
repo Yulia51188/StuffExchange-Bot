@@ -148,6 +148,7 @@ def get_random_stuff(chat_id):
 
 def handle_error(bot, update, error):
     logger.error('Update "%s" caused error "%s"', update, error)
+    return States.WAITING_FOR_CLICK
 
 
 def handle_start(update, context):
