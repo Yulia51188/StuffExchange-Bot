@@ -1,6 +1,6 @@
 # StuffExchange-Bot
 
-Free exchange service in Telegram
+!!!!!!!!! Free exchange service in Telegram !!!!!!!!!
 To place an item for exchange, click the “Add item” button. After that, the things of other users will become available to you. Click the "Find item" button and the bot sends you photos of items to exchange. If you like a thing - press the button "Exchange", no - dial "Find a thing" again. Clicked "exchange"? - if the owner of the item likes one of your items, the bot sends contacts to both of you.
 
 ## Demo
