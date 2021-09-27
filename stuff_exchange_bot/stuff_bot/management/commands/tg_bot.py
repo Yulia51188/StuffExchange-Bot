@@ -245,7 +245,7 @@ def get_start_keyboard_markup():
         ['Добавить вещь'],
         ['Найти вещь'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
 
 def get_full_keyboard_markup():
@@ -254,7 +254,7 @@ def get_full_keyboard_markup():
         ['Найти вещь'],
         ['Хочу обменяться'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
 
 class Command(BaseCommand):
