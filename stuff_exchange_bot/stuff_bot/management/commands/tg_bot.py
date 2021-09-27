@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from stuff_bot.models import Profile, Stuff
-from telegram import Bot, ReplyKeyboardMarkup
+from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     CommandHandler,
     ConversationHandler,
@@ -34,6 +34,7 @@ class States(Enum):
     WAITING_INPUT_TITLE = 2
     WAITING_INPUT_PHOTO = 3
     INPUT_CONTACT = 4
+    INPUT_LOCATION = 5
 
 
 # TO DO: add db functions
@@ -64,7 +65,7 @@ def add_user_to_db(chat_id, user):
     logger.info(f'Update_user {profile.external_id}, username '
         f'{profile.tg_username}, contact {profile.contact}')
     logger.info(f'Is user contact: {bool(profile.tg_username or profile.contact)}')
-    return profile.tg_username or profile.contact
+    return profile.tg_username or profile.contact, bool(profile.lat)
 
 
 def make_exchange(chat_id, stuff_id):
@@ -134,15 +135,14 @@ def handle_error(bot, update, error):
 
 def handle_start(update, context):
     user = update.effective_user
-    is_contact = add_user_to_db(update.message.chat_id, user)
+    is_contact, is_location = add_user_to_db(update.message.chat_id, user)
     if not is_contact:
         update.message.reply_text(
             text=dedent(f'''
             Привет, {user.first_name}!
             У тебя не указано имя пользователя в Телеграме.
 
-            Укажи телефон или email, чтобы при обмене с тобой можно было\
-            связаться'''
+            Укажи телефон или email, чтобы при обмене с тобой можно было связаться'''
             )
         ) 
         return States.INPUT_CONTACT
@@ -150,6 +150,12 @@ def handle_start(update, context):
         text=f'Привет, {user.first_name}!',
         reply_markup=get_start_keyboard_markup()
     ) 
+    # if not is_location:
+    #     update.message.reply_text(
+    #         text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+    #         reply_markup=get_location_keyboard()
+    #     )         
+    #     return States.INPUT_LOCATION
     return States.WAITING_FOR_CLICK
 
 
@@ -190,6 +196,22 @@ def handle_add_contact(update, context):
     return States.WAITING_FOR_CLICK
 
 
+def handle_add_location(update, context):
+    profile = Profile.objects.get(external_id=update.message.chat_id)
+    # coords = 
+    profile.lat = 55
+    profile.lon = 23
+    profile.save()    
+    update.message.reply_text(
+        f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
+        reply_markup=get_start_keyboard_markup()
+    )
+    logger.info(f'Пользователю {profile.chat_id} добавлено местоположение '
+        f'{profile.lat}, {profile.lon}')
+    return States.WAITING_FOR_CLICK    
+
+
+
 def handle_stop(update, context):
     user = update.effective_user
     update.message.reply_text(f'До свидания, {user.username}!',
@@ -212,7 +234,7 @@ def handle_new_stuff_photo(update, context):
         _new_stuff_id)
     update.message.reply_text(
         f'Фото вещи добавлено',
-        reply_markup=get_start_keyboard_markup()
+        reply_markup=get_start_keyboard_markup(),
     )    
     return States.WAITING_FOR_CLICK
 
@@ -269,6 +291,13 @@ def handle_no_photo(update, context):
 
 def get_empty_keyboard():
     return ReplyKeyboardMarkup()
+
+
+def get_location_keyboard():
+    keyboard = [
+        [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)]
+    ]
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
 
 def get_start_keyboard_markup():
@@ -332,6 +361,13 @@ class Command(BaseCommand):
                 States.INPUT_CONTACT: [
                     MessageHandler(Filters.text & ~Filters.command,
                         handle_add_contact)
+                ],
+                States.INPUT_LOCATION:
+                [
+                    MessageHandler(Filters.text & ~Filters.command,
+                        handle_add_location),
+                    MessageHandler(Filters.photo, handle_add_location),
+                    MessageHandler(Filters.photo, handle_add_location),
                 ],
             },
             fallbacks=[CommandHandler('stop', handle_stop)]
