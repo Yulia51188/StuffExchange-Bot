@@ -212,11 +212,11 @@ def handle_add_contact(update, context):
 
 def handle_add_location(update, context):
     profile = Profile.objects.get(external_id=update.message.chat_id)
-    logger.info(f'{update.message.location.latitude}, {update.message.location.longitude}')
-    profile.save() 
     if update.message.location: 
         profile.lat = update.message.location.latitude  
         profile.lon = update.message.location.longitude
+        profile.save() 
+        
         update.message.reply_text(
             f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
             reply_markup=get_start_keyboard_markup()
