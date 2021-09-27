@@ -7,12 +7,18 @@ class Profile(models.Model):
         verbose_name='Внешний ID пользователя',
         unique=True,
     )
-    name = models.TextField(
-        verbose_name='Имя пользователя',
-    )
+
+    tg_username = models.CharField('Имя пользователя в Телеграме',
+        max_length=50, blank=True, default='')
+    first_name = models.CharField('Имя',
+        max_length=256, blank=True, default='')
+    last_name = models.CharField('Фамилия',
+        max_length=256, blank=True, default='')
+    contact = models.CharField('Контакт для связи', max_length=256,
+        blank=True, default='')
 
     def __str__(self):
-        return f'{self.name}'
+        return f'{self.tg_username}'
 
     class Meta:
         verbose_name = 'Профиль'
@@ -21,9 +27,9 @@ class Profile(models.Model):
 
 class Stuff(models.Model):
     profile = models.ForeignKey(
-        to='stuff_bot.Profile',
+        to='Profile',
         verbose_name='Профиль',
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
     description = models.CharField(max_length=256)
 

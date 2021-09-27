@@ -1,5 +1,5 @@
-import os
 from enum import Enum
+from textwrap import dedent
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -28,12 +28,12 @@ _current_stuff_id = None
 _new_stuff_id = None
 
 
-
 class States(Enum):
     START = 0
     WAITING_FOR_CLICK = 1
     WAITING_INPUT_TITLE = 2
     WAITING_INPUT_PHOTO = 3
+    INPUT_CONTACT = 4
 
 
 # TO DO: add db functions
@@ -52,12 +52,19 @@ def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
 
 
 def add_user_to_db(chat_id, user):
-    p, _ = Profile.objects.get_or_create(
-        external_id=chat_id,
-        name=user.username
-    )
-    p.save()
-    pass
+    profile, _ = Profile.objects.get_or_create(external_id=chat_id)
+
+    logger.info(f'Get profile {profile}')
+    profile.tg_username = user.username or ''
+    profile.first_name = user.first_name or ''
+    profile.last_name = user.last_name or ''
+
+    profile.save()
+
+    logger.info(f'Update_user {profile.external_id}, username '
+        f'{profile.tg_username}, contact {profile.contact}')
+    logger.info(f'Is user contact: {bool(profile.tg_username or profile.contact)}')
+    return profile.tg_username or profile.contact
 
 
 def make_exchange(chat_id, stuff_id):
@@ -127,11 +134,22 @@ def handle_error(bot, update, error):
 
 def handle_start(update, context):
     user = update.effective_user
+    is_contact = add_user_to_db(update.message.chat_id, user)
+    if not is_contact:
+        update.message.reply_text(
+            text=dedent(f'''
+            Привет, {user.first_name}!
+            У тебя не указано имя пользователя в Телеграме.
+
+            Укажи телефон или email, чтобы при обмене с тобой можно было\
+            связаться'''
+            )
+        ) 
+        return States.INPUT_CONTACT
     update.message.reply_text(
         text=f'Привет, {user.first_name}!',
         reply_markup=get_start_keyboard_markup()
     ) 
-    add_user_to_db(update.message.chat_id, user)
     return States.WAITING_FOR_CLICK
 
 
@@ -160,6 +178,18 @@ def handle_find_stuff(update, context):
     return States.WAITING_FOR_CLICK
 
 
+def handle_add_contact(update, context):
+    profile = Profile.objects.get(external_id=update.message.chat_id)
+    profile.contact = update.message.text
+    profile.save()
+    update.message.reply_text(
+        f'В профиль добавлен контакт для связи: {profile.contact}',
+        reply_markup=get_start_keyboard_markup()
+    )
+    logger.info(f'Пользователю {profile.chat_id} добавлен контакт {profile.contact}')
+    return States.WAITING_FOR_CLICK
+
+
 def handle_stop(update, context):
     user = update.effective_user
     update.message.reply_text(f'До свидания, {user.username}!',
@@ -173,6 +203,7 @@ def handle_add_stuff(update, context):
 
     update.message.reply_text(f'Введите название вещи')
     return States.WAITING_INPUT_TITLE
+
 
 def handle_new_stuff_photo(update, context):
     global _new_stuff_id
@@ -286,7 +317,8 @@ class Command(BaseCommand):
                                    handle_find_stuff),
                     MessageHandler(Filters.regex('^Хочу обменяться$'),
                                    handle_exchange),
-                    MessageHandler(Filters.text & ~Filters.command, handle_unknown)
+                    MessageHandler(Filters.text & ~Filters.command,
+                        handle_unknown)
                 ],
                 States.WAITING_INPUT_TITLE: [
                     MessageHandler(Filters.text & ~Filters.command,
@@ -294,8 +326,13 @@ class Command(BaseCommand):
                 ],
                 States.WAITING_INPUT_PHOTO: [
                     MessageHandler(Filters.photo, handle_new_stuff_photo),
-                    MessageHandler(Filters.text & ~Filters.command, handle_no_photo)
-                ]
+                    MessageHandler(Filters.text & ~Filters.command,
+                        handle_no_photo)
+                ],
+                States.INPUT_CONTACT: [
+                    MessageHandler(Filters.text & ~Filters.command,
+                        handle_add_contact)
+                ],
             },
             fallbacks=[CommandHandler('stop', handle_stop)]
         )

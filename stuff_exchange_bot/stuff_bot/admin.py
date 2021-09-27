@@ -6,7 +6,8 @@ from .models import Stuff
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('id', 'external_id', 'name')
+    list_display = ('id', 'external_id', 'tg_username', 'first_name',
+        'last_name', 'contact')
 
 
 @admin.register(Stuff)
