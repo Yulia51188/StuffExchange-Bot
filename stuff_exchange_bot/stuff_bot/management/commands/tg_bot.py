@@ -150,12 +150,12 @@ def handle_start(update, context):
         text=f'Привет, {user.first_name}!',
         reply_markup=get_start_keyboard_markup()
     ) 
-    # if not is_location:
-    #     update.message.reply_text(
-    #         text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
-    #         reply_markup=get_location_keyboard()
-    #     )         
-    #     return States.INPUT_LOCATION
+    if not is_location:
+        update.message.reply_text(
+            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            reply_markup=get_location_keyboard()
+        )         
+        return States.INPUT_LOCATION
     return States.WAITING_FOR_CLICK
 
 
@@ -192,7 +192,7 @@ def handle_add_contact(update, context):
         f'В профиль добавлен контакт для связи: {profile.contact}',
         reply_markup=get_start_keyboard_markup()
     )
-    logger.info(f'Пользователю {profile.chat_id} добавлен контакт {profile.contact}')
+    logger.info(f'Пользователю {profile.external_id} добавлен контакт {profile.contact}')
     return States.WAITING_FOR_CLICK
 
 
@@ -206,7 +206,7 @@ def handle_add_location(update, context):
         f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
         reply_markup=get_start_keyboard_markup()
     )
-    logger.info(f'Пользователю {profile.chat_id} добавлено местоположение '
+    logger.info(f'Пользователю {profile.external_id} добавлено местоположение '
         f'{profile.lat}, {profile.lon}')
     return States.WAITING_FOR_CLICK    
 
@@ -321,19 +321,6 @@ class Command(BaseCommand):
     help = 'Телеграм-бот'
 
     def handle(self, *args, **options):
-        # 1 -- правильное подключение
-        request = Request(
-            connect_timeout=0.5,
-            read_timeout=1.0,
-        )
-        bot = Bot(
-            request=request,
-            token=settings.TOKEN,
-            base_url=getattr(settings, 'PROXY_URL', None),
-        )
-        print(bot.get_me())
-
-        # 2 -- обработчики
         updater = Updater(settings.TOKEN)
         dispatcher = updater.dispatcher
         conv_handler = ConversationHandler(
@@ -364,16 +351,12 @@ class Command(BaseCommand):
                 ],
                 States.INPUT_LOCATION:
                 [
-                    MessageHandler(Filters.text & ~Filters.command,
-                        handle_add_location),
-                    MessageHandler(Filters.photo, handle_add_location),
-                    MessageHandler(Filters.photo, handle_add_location),
+                    MessageHandler(None, handle_add_location),
                 ],
             },
             fallbacks=[CommandHandler('stop', handle_stop)]
         )
         dispatcher.add_handler(conv_handler)
 
-        # 3 -- запустить бесконечную обработку входящих сообщений
         updater.start_polling()
         updater.idle()
