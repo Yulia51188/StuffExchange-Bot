@@ -21,7 +21,7 @@ class Profile(models.Model):
     lon = models.FloatField('Долгота', blank=True, null=True)    
 
     def __str__(self):
-        return f'{self.tg_username}'
+        return f'{self.first_name} ({self.external_id})'
 
     class Meta:
         verbose_name = 'Профиль'
