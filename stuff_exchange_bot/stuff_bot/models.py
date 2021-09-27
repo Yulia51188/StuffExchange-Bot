@@ -1,5 +1,6 @@
-from django.db import models
 import jsonfield
+from django.db import models
+
 
 class Profile(models.Model):
     external_id = models.PositiveIntegerField(
@@ -24,16 +25,13 @@ class Stuff(models.Model):
         verbose_name='Профиль',
         on_delete=models.PROTECT,
     )
-    description = models.CharField(max_length = 256)
+    description = models.CharField(max_length=256)
 
-    image_url = models.CharField(max_length = 256)
+    image_url = models.CharField(max_length=256)
 
-    status_like = models.BooleanField(default=False,
-        verbose_name='Нравится'
-    )
-    status_like_users = jsonfield.JSONField(default = False)
+    status_like = models.BooleanField(default=False, verbose_name='Нравится')
+    status_like_users = jsonfield.JSONField(default=False)
+    
     class Meta:
         verbose_name = 'Вещь'
         verbose_name_plural = 'Вещи'
-
-# Create your models here.
