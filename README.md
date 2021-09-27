@@ -1,5 +1,6 @@
 # StuffExchange-Bot
 
+<<<<<<< HEAD
 Free exchange service in Telegram
 To place an item for exchange, click the “Add item” button. After that, the things of other users will become available to you. Click the "Find item" button and the bot sends you photos of items to exchange. If you like a thing - press the button "Exchange", no - dial "Find a thing" again. Clicked "exchange"? - if the owner of the item likes one of your items, the bot sends contacts to both of you.
 
@@ -26,3 +27,10 @@ To get started go to terminal(mac os) or CMD (Windows)
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 
+=======
+  - python3 tg_bot.py run
+
+## Как работает бот
+
+![tg_bot_demo](demo/bot_demo.gif)
+>>>>>>> master

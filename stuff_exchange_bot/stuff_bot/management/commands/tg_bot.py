@@ -1,4 +1,3 @@
-
 import logging
 import random
 
@@ -8,9 +7,8 @@ from textwrap import dedent
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
-from dotenv import load_dotenv
 from stuff_bot.models import Profile, Stuff
-from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     CommandHandler,
     ConversationHandler,
@@ -18,7 +16,6 @@ from telegram.ext import (
     MessageHandler,
     Updater,
 )
-from telegram.utils.request import Request
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,6 +26,7 @@ logger = logging.getLogger(__name__)
 _current_stuff_id = None
 _new_stuff_id = None
 
+
 class States(Enum):
     START = 0
     WAITING_FOR_CLICK = 1
@@ -38,20 +36,20 @@ class States(Enum):
     INPUT_LOCATION = 5
 
 
-# TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
-    profile = Profile.objects.filter(name=user.username)[0]
+    profile = Profile.objects.get(external_id=chat_id)
     stuff = Stuff.objects.create(
         profile=profile,
         description=title,
     )
-    stuff_id = stuff.id
-    return stuff_id
+    return stuff.id
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
-    add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
-    pass
+    stuff = Stuff.objects.get(id=_new_stuff_id)
+    stuff.image_url = photo_url
+    stuff.save()
+    return stuff.id
 
 
 def add_user_to_db(chat_id, user):
@@ -75,14 +73,18 @@ def make_exchange(chat_id, stuff_id):
     status_like = stuff_info.status_like_users
     if status_like is False:
         new_status_like = [chat_id]
+        
         stuff_info = Stuff.objects.get(id=stuff_id)
         stuff_info.status_like_users = new_status_like
         stuff_info.save()
+
         username_1 = Profile.objects.get(external_id=chat_id)
         users_stuff = Stuff.objects.filter(profile=username_1)
         stuff_username_2 = Stuff.objects.get(id=stuff_id)
+        
         username_2 = stuff_username_2.profile
         is_available = False
+        
         for stuff in users_stuff:
             if stuff.status_like_users is False:
                 pass
@@ -90,11 +92,15 @@ def make_exchange(chat_id, stuff_id):
                 for user in stuff.status_like_users:
                     if user == username_2.external_id:
                         is_available = True
-        stuff = {'id': chat_id, 'title': stuff_info.description}
-        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': username_2.external_id, 'username': username}
+        stuff = {'id': stuff_id, 'title': stuff_info.description}
+        owner = {
+            'chat_id': username_2.external_id,
+            'username': username_2.tg_username,
+            "contact": username_2.contact
+        }
+        current_user_contact = username_1.contact
         logger.info(is_available)
-        return is_available, stuff, exchange_stuff, owner
+        return is_available, stuff, owner, current_user_contact
     else:
         stuff_info = Stuff.objects.get(id=stuff_id)
         users_likes = stuff_info.status_like_users
@@ -116,9 +122,13 @@ def make_exchange(chat_id, stuff_id):
                     if user == username_2.external_id:
                         is_available = True
         stuff = {'id': chat_id, 'title': stuff_info.description}
-        exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': username_2.external_id, 'username': username_2}
-        return is_available, stuff, exchange_stuff, owner
+        owner = {
+            'chat_id': username_2.external_id,
+            'username': username_2.tg_username,
+            "contact": username_2.contact,
+        }
+        current_user_contact = username_1.contact
+        return is_available, stuff, owner, current_user_contact
 
 
 def get_random_stuff(chat_id):
@@ -136,6 +146,7 @@ def get_random_stuff(chat_id):
 
 def handle_error(bot, update, error):
     logger.error('Update "%s" caused error "%s"', update, error)
+    return States.WAITING_FOR_CLICK
 
 
 def handle_start(update, context):
@@ -147,7 +158,8 @@ def handle_start(update, context):
             Привет, {user.first_name}!
             У тебя не указано имя пользователя в Телеграме.
 
-            Укажи телефон или email, чтобы при обмене с тобой можно было связаться'''
+            Укажи телефон или email, чтобы при обмене с тобой можно было связаться
+            '''
             )
         ) 
         return States.INPUT_CONTACT
@@ -157,7 +169,7 @@ def handle_start(update, context):
     )
     if not is_location:
         update.message.reply_text(
-            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            text='Укажи местоположение, чтобы я мог найти вещи рядом',
             reply_markup=get_location_keyboard()
         )         
         return States.INPUT_LOCATION
@@ -188,10 +200,11 @@ def handle_add_contact(update, context):
         f'В профиль добавлен контакт для связи: {profile.contact}',
         reply_markup=get_start_keyboard_markup()
     )
-    logger.info(f'Пользователю {profile.external_id} добавлен контакт {profile.contact}')
+    logger.info(f'Пользователю {profile.external_id}'
+        f'добавлен контакт {profile.contact}')
     if not profile.lat:
         update.message.reply_text(
-            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            text='Укажи местоположение, чтобы я мог найти вещи рядом',
             reply_markup=get_location_keyboard()
         )         
         return States.INPUT_LOCATION
@@ -200,17 +213,17 @@ def handle_add_contact(update, context):
 
 def handle_add_location(update, context):
     profile = Profile.objects.get(external_id=update.message.chat_id)
-    logger.info(f'{update.message.location.latitude}, {update.message.location.longitude}')
-    profile.save() 
     if update.message.location: 
         profile.lat = update.message.location.latitude  
         profile.lon = update.message.location.longitude
+        profile.save() 
+        
         update.message.reply_text(
             f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
             reply_markup=get_start_keyboard_markup()
         )
-        logger.info(f'Пользователю {profile.external_id} добавлено местоположение '
-            f'{profile.lat}, {profile.lon}')
+        logger.info(f'Пользователю {profile.external_id} добавлено '
+            f'местоположение {profile.lat}, {profile.lon}')
     return States.WAITING_FOR_CLICK    
 
 
@@ -224,8 +237,7 @@ def handle_no_location(update, context):
 
 def handle_stop(update, context):
     user = update.effective_user
-    update.message.reply_text(f'До свидания, {user.username}!',
-        reply_markup=get_empty_keyboard())
+    update.message.reply_text(f'До свидания, {user.username}!')
     return ConversationHandler.END
 
 
@@ -243,7 +255,7 @@ def handle_new_stuff_photo(update, context):
     add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id,
         _new_stuff_id)
     update.message.reply_text(
-        f'Фото вещи добавлено',
+        'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup(),
     )    
     return States.WAITING_FOR_CLICK
@@ -264,18 +276,26 @@ def handle_new_stuff_title(update, context):
 def handle_exchange(update, context):
     global _current_stuff
 
-    is_available, stuff, exchange_stuff, owner = make_exchange(
+    is_available, stuff, owner, current_user_contact = make_exchange(
         update.message.chat_id, _current_stuff)
     update.message.reply_text('Заявка на обмен принята')
     if is_available:
-        update.message.reply_text(f'Контакты для обмена '
-                                  f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
-                                  reply_markup=get_start_keyboard_markup()
-                                  )
+        if owner["username"]:
+            owner_contact = f'@{owner["username"]}'
+        else:
+            owner_contact = owner["contact"]
+        current_user = update.effective_user
+        if current_user.username:
+            user_contact = f'@{current_user.username}'
+        else:
+            user_contact = current_user_contact
+        update.message.reply_text(
+            f'Контакты для обмена {stuff["title"]}: {owner_contact}',
+            reply_markup=get_start_keyboard_markup()
+        )
         update.message.bot.send_message(
             chat_id=int(owner["chat_id"]),
-            text=f'''Контакты для обмена "{exchange_stuff["title"]}\
-                #{exchange_stuff["id"]}": @{update.effective_user.username}'''
+            text=f'Контакты для обмена {stuff["title"]}: {user_contact}'
         )
 
     _current_stuff = None
@@ -298,15 +318,13 @@ def handle_no_photo(update, context):
     return States.WAITING_INPUT_PHOTO
 
 
-def get_empty_keyboard():
-    return ReplyKeyboardMarkup()
-
-
 def get_location_keyboard():
     keyboard = [
-        [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)]
+        [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)],
+        ['Не указывать местоположение'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 def get_start_keyboard_markup():
@@ -314,7 +332,8 @@ def get_start_keyboard_markup():
         ['Добавить вещь'],
         ['Найти вещь'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 def get_full_keyboard_markup():
@@ -323,7 +342,8 @@ def get_full_keyboard_markup():
         ['Найти вещь'],
         ['Хочу обменяться'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 class Command(BaseCommand):
@@ -351,8 +371,7 @@ class Command(BaseCommand):
                 ],
                 States.WAITING_INPUT_PHOTO: [
                     MessageHandler(Filters.photo, handle_new_stuff_photo),
-                    MessageHandler(Filters.text & ~Filters.command,
-                        handle_no_photo)
+                    MessageHandler(~Filters.command, handle_no_photo)
                 ],
                 States.INPUT_CONTACT: [
                     MessageHandler(Filters.text & ~Filters.command,
@@ -360,13 +379,18 @@ class Command(BaseCommand):
                 ],
                 States.INPUT_LOCATION:
                 [
-                    MessageHandler(Filters.regex('^Нет$'), handle_no_location),
-                    MessageHandler(None, handle_add_location),
+                    MessageHandler(
+                        Filters.regex('Не указывать местоположение$'),
+                        handle_no_location
+                    ),
+                    MessageHandler(~Filters.command, handle_add_location),
                 ],
             },
             fallbacks=[CommandHandler('stop', handle_stop)]
         )
         dispatcher.add_handler(conv_handler)
+        dispatcher.add_error_handler(handle_error)
+        dispatcher.add_handler(CommandHandler("start", handle_start))
 
         updater.start_polling()
         updater.idle()
