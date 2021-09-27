@@ -1,9 +1,14 @@
+
+import logging
+import random
+
 from enum import Enum
 from textwrap import dedent
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-
+from django.db.models import Q
+from dotenv import load_dotenv
 from stuff_bot.models import Profile, Stuff
 from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -15,18 +20,14 @@ from telegram.ext import (
 )
 from telegram.utils.request import Request
 
-import logging
-import random
-from django.db.models import Q
-
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
 _current_stuff_id = None
 _new_stuff_id = None
-
 
 class States(Enum):
     START = 0
@@ -50,6 +51,7 @@ def create_new_stuff(chat_id, user, title):
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
     add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
+    pass
 
 
 def add_user_to_db(chat_id, user):
@@ -76,22 +78,22 @@ def make_exchange(chat_id, stuff_id):
         stuff_info = Stuff.objects.get(id=stuff_id)
         stuff_info.status_like_users = new_status_like
         stuff_info.save()
-        stuff_info = Stuff.objects.get(id=stuff_id)
-        status_like_users = stuff_info.status_like_users
-        logger.info(status_like_users)
-        username = stuff_info.profile
-        users_stuff = Stuff.objects.filter(profile=username)
+        username_1 = Profile.objects.get(external_id=chat_id)
+        users_stuff = Stuff.objects.filter(profile=username_1)
+        stuff_username_2 = Stuff.objects.get(id=stuff_id)
+        username_2 = stuff_username_2.profile
         is_available = False
         for stuff in users_stuff:
             if stuff.status_like_users is False:
                 pass
             else:
                 for user in stuff.status_like_users:
-                    if user == username.id:
+                    if user == username_2.external_id:
                         is_available = True
         stuff = {'id': chat_id, 'title': stuff_info.description}
         exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': chat_id, 'username': username}
+        owner = {'chat_id': username_2.external_id, 'username': username}
+        logger.info(is_available)
         return is_available, stuff, exchange_stuff, owner
     else:
         stuff_info = Stuff.objects.get(id=stuff_id)
@@ -100,19 +102,22 @@ def make_exchange(chat_id, stuff_id):
         logger.info(new_users_likes)
         stuff_info.status_like_users = new_users_likes
         stuff_info.save()
-        username = stuff_info.profile
-        users_stuff = Stuff.objects.filter(profile=username)
+
+        username_1 = Profile.objects.get(external_id=chat_id)
+        users_stuff = Stuff.objects.filter(profile=username_1)
+        stuff_username_2 = Stuff.objects.get(id=stuff_id)
+        username_2 = stuff_username_2.profile
         is_available = False
         for stuff in users_stuff:
             if stuff.status_like_users is False:
                 pass
             else:
                 for user in stuff.status_like_users:
-                    if user == username.id:
+                    if user == username_2.external_id:
                         is_available = True
         stuff = {'id': chat_id, 'title': stuff_info.description}
         exchange_stuff = {'id': stuff_id, 'title': stuff_info.description}
-        owner = {'chat_id': chat_id, 'username': username}
+        owner = {'chat_id': username_2.external_id, 'username': username_2}
         return is_available, stuff, exchange_stuff, owner
 
 
@@ -149,7 +154,7 @@ def handle_start(update, context):
     update.message.reply_text(
         text=f'Привет, {user.first_name}!',
         reply_markup=get_start_keyboard_markup()
-    ) 
+    )
     if not is_location:
         update.message.reply_text(
             text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
@@ -160,26 +165,17 @@ def handle_start(update, context):
 
 
 def handle_find_stuff(update, context):
-    global _current_stuff_id
-
-    random_stuff = get_random_stuff(
+    stuff_id, stuff_title, stuff_photo = get_random_stuff(
         update.message.chat_id)
-    if not random_stuff:
-        update.message.reply_text(
-            text='Не найдено вещей других пользователей',
-            reply_markup=get_start_keyboard_markup()
-        ) 
-        _current_stuff_id = None              
-    
-    stuff_id, stuff_title, stuff_photo_url = random_stuff
     update.message.bot.send_photo(
         chat_id=update.message.chat_id,
-        photo=stuff_photo_url,
+        photo=stuff_photo,
         caption=f'{stuff_title}',
         reply_markup=get_full_keyboard_markup()
     )
 
-    _current_stuff_id = stuff_id
+    global _current_stuff
+    _current_stuff = stuff_id
 
     return States.WAITING_FOR_CLICK
 
@@ -234,8 +230,8 @@ def handle_stop(update, context):
 
 
 def handle_add_stuff(update, context):
-    global _current_stuff_id
-    _current_stuff_id = None
+    global _current_stuff
+    _current_stuff = None
 
     update.message.reply_text(f'Введите название вещи')
     return States.WAITING_INPUT_TITLE
@@ -259,32 +255,31 @@ def handle_new_stuff_title(update, context):
     stuff_title = update.message.text
     stuff_id = create_new_stuff(update.message.chat_id, update.effective_user,
         stuff_title)
-    logger.info(
-        f'Добавлена вещь {stuff_title} #{stuff_id} от {update.message.chat_id}')
+    update.message.reply_text(f'Добавлена вещь, {stuff_title}')
     _new_stuff_id = stuff_id
     update.message.reply_text('Добавьте фотографию')
     return States.WAITING_INPUT_PHOTO
 
 
 def handle_exchange(update, context):
-    global _current_stuff_id
+    global _current_stuff
 
     is_available, stuff, exchange_stuff, owner = make_exchange(
-        update.message.chat_id, _current_stuff_id)
+        update.message.chat_id, _current_stuff)
     update.message.reply_text('Заявка на обмен принята')
     if is_available:
         update.message.reply_text(f'Контакты для обмена '
-            f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
-            reply_markup=get_start_keyboard_markup()
-        )
+                                  f'"{stuff["title"]}#{stuff["id"]}": @{owner["username"]}',
+                                  reply_markup=get_start_keyboard_markup()
+                                  )
         update.message.bot.send_message(
             chat_id=int(owner["chat_id"]),
             text=f'''Контакты для обмена "{exchange_stuff["title"]}\
                 #{exchange_stuff["id"]}": @{update.effective_user.username}'''
         )
 
-    _current_stuff_id = None
-    
+    _current_stuff = None
+
     return States.WAITING_FOR_CLICK
 
 
@@ -292,14 +287,14 @@ def handle_unknown(update, context):
     update.message.reply_text(
         'Сообщение не распознано',
         reply_markup=get_start_keyboard_markup()
-    )    
-    return States.WAITING_FOR_CLICK    
+    )
+    return States.WAITING_FOR_CLICK
 
 
 def handle_no_photo(update, context):
     update.message.reply_text(
         'Загрузите фото, пожалуйста'
-    )    
+    )
     return States.WAITING_INPUT_PHOTO
 
 
