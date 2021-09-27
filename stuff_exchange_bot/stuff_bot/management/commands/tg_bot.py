@@ -112,6 +112,8 @@ def get_random_stuff(chat_id):
     user = Profile.objects.get(external_id=chat_id)
     username = user.id
     random_stuff = list(Stuff.objects.filter(~Q(profile=username)))
+    if not any(random_stuff):
+        return None
     random_item = random.choice(random_stuff)
     stuff_id = random_item.id
     stuff_title = random_item.description
