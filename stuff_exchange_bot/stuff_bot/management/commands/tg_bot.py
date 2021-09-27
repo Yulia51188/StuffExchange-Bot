@@ -382,6 +382,7 @@ class Command(BaseCommand):
             fallbacks=[CommandHandler('stop', handle_stop)]
         )
         dispatcher.add_handler(conv_handler)
+        dispatcher.add_error_handler(handle_error)
 
         updater.start_polling()
         updater.idle()
