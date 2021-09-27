@@ -1,4 +1,3 @@
-
 import logging
 import random
 
@@ -8,9 +7,8 @@ from textwrap import dedent
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
-from dotenv import load_dotenv
 from stuff_bot.models import Profile, Stuff
-from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     CommandHandler,
     ConversationHandler,
@@ -18,7 +16,6 @@ from telegram.ext import (
     MessageHandler,
     Updater,
 )
-from telegram.utils.request import Request
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,6 +26,7 @@ logger = logging.getLogger(__name__)
 _current_stuff_id = None
 _new_stuff_id = None
 
+
 class States(Enum):
     START = 0
     WAITING_FOR_CLICK = 1
@@ -38,7 +36,6 @@ class States(Enum):
     INPUT_LOCATION = 5
 
 
-# TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
     profile = Profile.objects.get(external_id=chat_id)
     stuff = Stuff.objects.create(
@@ -49,9 +46,10 @@ def create_new_stuff(chat_id, user, title):
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
-    add_image_url = Stuff.objects \
+    stuff = Stuff.objects \
         .filter(id=_new_stuff_id) \
         .update(image_url=photo_url)
+    return stuff.id
 
 
 def add_user_to_db(chat_id, user):
@@ -160,7 +158,8 @@ def handle_start(update, context):
             Привет, {user.first_name}!
             У тебя не указано имя пользователя в Телеграме.
 
-            Укажи телефон или email, чтобы при обмене с тобой можно было связаться'''
+            Укажи телефон или email, чтобы при обмене с тобой можно было связаться
+            '''
             )
         ) 
         return States.INPUT_CONTACT
@@ -170,7 +169,7 @@ def handle_start(update, context):
     )
     if not is_location:
         update.message.reply_text(
-            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            text='Укажи местоположение, чтобы я мог найти вещи рядом',
             reply_markup=get_location_keyboard()
         )         
         return States.INPUT_LOCATION
@@ -201,10 +200,11 @@ def handle_add_contact(update, context):
         f'В профиль добавлен контакт для связи: {profile.contact}',
         reply_markup=get_start_keyboard_markup()
     )
-    logger.info(f'Пользователю {profile.external_id} добавлен контакт {profile.contact}')
+    logger.info(f'Пользователю {profile.external_id}'
+        f'добавлен контакт {profile.contact}')
     if not profile.lat:
         update.message.reply_text(
-            text=f'Укажи местоположение, чтобы я мог найти вещи рядом',
+            text='Укажи местоположение, чтобы я мог найти вещи рядом',
             reply_markup=get_location_keyboard()
         )         
         return States.INPUT_LOCATION
@@ -222,8 +222,8 @@ def handle_add_location(update, context):
             f'В профиль добавлено местоположение: {profile.lat}, {profile.lon}',
             reply_markup=get_start_keyboard_markup()
         )
-        logger.info(f'Пользователю {profile.external_id} добавлено местоположение '
-            f'{profile.lat}, {profile.lon}')
+        logger.info(f'Пользователю {profile.external_id} добавлено '
+            f'местоположение {profile.lat}, {profile.lon}')
     return States.WAITING_FOR_CLICK    
 
 
@@ -255,7 +255,7 @@ def handle_new_stuff_photo(update, context):
     add_photo_to_new_stuff(update.message.chat_id, stuff_photo.file_id,
         _new_stuff_id)
     update.message.reply_text(
-        f'Фото вещи добавлено',
+        'Фото вещи добавлено',
         reply_markup=get_start_keyboard_markup(),
     )    
     return States.WAITING_FOR_CLICK
@@ -323,7 +323,8 @@ def get_location_keyboard():
         [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)],
         ['Не указывать местоположение'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 def get_start_keyboard_markup():
@@ -331,7 +332,8 @@ def get_start_keyboard_markup():
         ['Добавить вещь'],
         ['Найти вещь'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 def get_full_keyboard_markup():
@@ -340,7 +342,8 @@ def get_full_keyboard_markup():
         ['Найти вещь'],
         ['Хочу обменяться'],
     ]
-    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True,
+        resize_keyboard=True)
 
 
 class Command(BaseCommand):
