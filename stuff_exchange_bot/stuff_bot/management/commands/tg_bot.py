@@ -40,18 +40,18 @@ class States(Enum):
 
 # TO DO: add db functions
 def create_new_stuff(chat_id, user, title):
-    profile = Profile.objects.filter(name=user.username)[0]
+    profile = Profile.objects.get(external_id=chat_id)
     stuff = Stuff.objects.create(
         profile=profile,
         description=title,
     )
-    stuff_id = stuff.id
-    return stuff_id
+    return stuff.id
 
 
 def add_photo_to_new_stuff(chat_id, photo_url, _new_stuff_id):
-    add_image_url = Stuff.objects.filter(id=_new_stuff_id).update(image_url=photo_url)
-    pass
+    add_image_url = Stuff.objects \
+        .filter(id=_new_stuff_id) \
+        .update(image_url=photo_url)
 
 
 def add_user_to_db(chat_id, user):
