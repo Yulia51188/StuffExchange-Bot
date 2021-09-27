@@ -320,7 +320,8 @@ def handle_no_photo(update, context):
 
 def get_location_keyboard():
     keyboard = [
-        [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)]
+        [KeyboardButton('Отправить свою локацию 🗺️', request_location=True)],
+        ['Не указывать местоположение'],
     ]
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
@@ -376,7 +377,10 @@ class Command(BaseCommand):
                 ],
                 States.INPUT_LOCATION:
                 [
-                    MessageHandler(Filters.regex('^Нет$'), handle_no_location),
+                    MessageHandler(
+                        Filters.regex('Не указывать местоположение$'),
+                        handle_no_location
+                    ),
                     MessageHandler(None, handle_add_location),
                 ],
             },
