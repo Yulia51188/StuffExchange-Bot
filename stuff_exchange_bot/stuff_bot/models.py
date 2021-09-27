@@ -1,5 +1,5 @@
 from django.db import models
-
+import jsonfield
 
 class Profile(models.Model):
     external_id = models.PositiveIntegerField(
@@ -31,7 +31,7 @@ class Stuff(models.Model):
     status_like = models.BooleanField(default=False,
         verbose_name='Нравится'
     )
-
+    status_like_users = jsonfield.JSONField(default = False)
     class Meta:
         verbose_name = 'Вещь'
         verbose_name_plural = 'Вещи'

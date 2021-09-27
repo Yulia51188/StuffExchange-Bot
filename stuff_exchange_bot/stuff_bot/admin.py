@@ -11,6 +11,6 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Stuff)
 class StuffAdmin(admin.ModelAdmin):
-    list_display = ('description', 'profile', 'image_url', 'status_like')
+    list_display = ('description', 'profile', 'image_url', 'status_like_users')
 
 # Register your models here.
