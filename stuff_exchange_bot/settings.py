@@ -84,7 +84,7 @@ DATABASES = {
         # 'ENGINE': env.str('DB_ENGINE', 'django.db.backends.sqlite3'),
         # 'NAME': BASE_DIR / env.str('DB_FILENAME', 'db.sqlite3'),
     }
-# }
+}
 
 db_from_env = dj_database_url.config()
 DATABASES['default'].update(db_from_env)
