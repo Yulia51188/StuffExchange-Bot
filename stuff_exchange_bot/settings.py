@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 
 from pathlib import Path
+import dj_database_url
 
 from environs import Env
 
@@ -80,11 +81,13 @@ WSGI_APPLICATION = 'stuff_exchange_bot.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': env.str('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': BASE_DIR / env.str('DB_FILENAME', 'db.sqlite3'),
+        # 'ENGINE': env.str('DB_ENGINE', 'django.db.backends.sqlite3'),
+        # 'NAME': BASE_DIR / env.str('DB_FILENAME', 'db.sqlite3'),
     }
-}
+# }
 
+db_from_env = dj_database_url.config()
+DATABASES['default'].update(db_from_env)
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
 
